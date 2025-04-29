@@ -1,0 +1,221 @@
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // Para abrir o WhatsApp
+
+void main() {
+  runApp(const PadariaWebApp());
+}
+
+class PadariaWebApp extends StatelessWidget {
+  const PadariaWebApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Gestão da Padaria - Web',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown),
+        useMaterial3: true,
+        fontFamily: 'Roboto',
+      ),
+      home: const WebHomePage(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class WebHomePage extends StatefulWidget {
+  const WebHomePage({super.key});
+
+  @override
+  State<WebHomePage> createState() => _WebHomePageState();
+}
+
+class _WebHomePageState extends State<WebHomePage> {
+  List<double> vendas = [];
+  List<double> fiados = [];
+  List<double> despesas = [];
+
+  final String whatsappNumber = '5544999999999'; // <- Coloque seu número com DDI (55 Brasil)
+
+  void adicionarRegistro(double valor, String tipo) {
+    setState(() {
+      if (tipo == 'Venda') vendas.add(valor);
+      if (tipo == 'Fiado') fiados.add(valor);
+      if (tipo == 'Despesa') despesas.add(valor);
+    });
+  }
+
+  double calcularTotal(List<double> lista) {
+    return lista.fold(0, (a, b) => a + b);
+  }
+
+  Future<void> abrirWhatsapp() async {
+    final Uri url = Uri.parse('https://wa.me/$whatsappNumber');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      throw 'Não foi possível abrir o WhatsApp';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalVendas = calcularTotal(vendas);
+    final totalFiados = calcularTotal(fiados);
+    final totalDespesas = calcularTotal(despesas);
+    final saldo = totalVendas - totalDespesas;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Gestão da Padaria - Web'),
+        centerTitle: true,
+      ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  children: [
+                    imagemTopo(),
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 16,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              resumoCard('Vendas', totalVendas, Colors.green),
+                              resumoCard('Fiados', totalFiados, Colors.orange),
+                              resumoCard('Despesas', totalDespesas, Colors.red),
+                              resumoCard('Saldo', saldo, saldo >= 0 ? Colors.greenAccent : Colors.redAccent),
+                            ],
+                          ),
+                          const SizedBox(height: 32),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              botaoAdicionar('Venda'),
+                              const SizedBox(width: 16),
+                              botaoAdicionar('Fiado'),
+                              const SizedBox(width: 16),
+                              botaoAdicionar('Despesa'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 30,
+            right: 30,
+            child: FloatingActionButton(
+              onPressed: abrirWhatsapp,
+              backgroundColor: Colors.green,
+              child: const Icon(Icons.whatsapp, size: 32),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget imagemTopo() {
+    return Container(
+      width: double.infinity,
+      height: 250,
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: NetworkImage('https://images.unsplash.com/photo-1604908177527-4117d303c43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1400&q=80'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Container(
+        color: Colors.black.withOpacity(0.4),
+        alignment: Alignment.center,
+        child: const Text(
+          'Bem-vindo à Gestão da Padaria',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget resumoCard(String titulo, double valor, Color cor) {
+    return Card(
+      elevation: 5,
+      color: cor.withOpacity(0.1),
+      child: SizedBox(
+        width: 200,
+        height: 130,
+        child: Center(
+          child: ListTile(
+            title: Text(
+              titulo,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: cor),
+            ),
+            subtitle: Text(
+              'R\$ ${valor.toStringAsFixed(2)}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget botaoAdicionar(String tipo) {
+    return ElevatedButton(
+      onPressed: () => abrirDialog(tipo),
+      child: Text('Adicionar $tipo'),
+    );
+  }
+
+  void abrirDialog(String tipo) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Adicionar $tipo'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Valor (R\$)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final valor = double.tryParse(controller.text);
+              if (valor != null) {
+                adicionarRegistro(valor, tipo);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
